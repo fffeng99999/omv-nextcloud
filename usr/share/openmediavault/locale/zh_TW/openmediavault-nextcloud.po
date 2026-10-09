@@ -1,0 +1,210 @@
+# Copyright (C) 2026 ${GITHUB_USER}
+# This file is distributed under the same license as the openmediavault-nextcloud package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: openmediavault-nextcloud 8.0.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-08 12:00+0800\n"
+"PO-Revision-Date: 2026-10-08 12:00+0800\n"
+"Last-Translator: ${GITHUB_USER}\n"
+"Language-Team: Chinese (Traditional)\n"
+"Language: zh_TW\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Nextcloud"
+msgstr "Nextcloud"
+
+msgid "Settings"
+msgstr "設定"
+
+msgid "Updated Nextcloud settings."
+msgstr "Nextcloud 設定已更新。"
+
+msgid "Running"
+msgstr "執行中"
+
+msgid "Stopped"
+msgstr "已停止"
+
+msgid "Partial"
+msgstr "部分執行"
+
+msgid "Not installed"
+msgstr "未安裝"
+
+msgid "Nextcloud is a self-hosted file sync and share solution. The stack is created in the Compose plugin (Services -> Compose -> Files) where it can also be inspected or edited; configure the Compose plugin shared folder first. Save the settings, click Apply, then use the buttons below to deploy and manage the stack. While the stack is running it starts automatically at boot."
+msgstr "Nextcloud 是自架的檔案同步與分享方案。堆疊會建立在 Compose 外掛中（服務 → Compose → 檔案），也可在那裡檢視或編輯；請先設定 Compose 外掛的共享資料夾。儲存設定並點「套用」後，用下方按鈕部署與管理堆疊。堆疊執行期間開機自動啟動。"
+
+msgid "Status"
+msgstr "狀態"
+
+msgid "Service status"
+msgstr "服務狀態"
+
+msgid "Running version"
+msgstr "執行版本"
+
+msgid "Latest version"
+msgstr "最新版本"
+
+msgid "Update available"
+msgstr "有可用更新"
+
+msgid "Service"
+msgstr "服務"
+
+msgid "Enabled"
+msgstr "啟用"
+
+msgid "Automatically manage the stack from OMV. On Apply the stack is (re)created; disabling the service removes the containers on Apply (data and database are kept)."
+msgstr "由 OMV 自動管理堆疊：點「套用」時建立/重建堆疊。停用服務會在「套用」時移除容器（資料與資料庫保留）。"
+
+msgid "Version"
+msgstr "版本"
+
+msgid "Nextcloud image tag"
+msgstr "Nextcloud 映像標籤"
+
+msgid "Docker image tag for the nextcloud image (e.g. 34.0.4-apache). Prefer pinning a specific version; upgrade with the Upgrade button or change the tag here and Apply."
+msgstr "nextcloud 映像的 Docker 標籤（如 34.0.4-apache）。建議固定具體版本；升級請用「升級」按鈕，或改標籤後點「套用」。"
+
+msgid "Storage"
+msgstr "儲存"
+
+msgid "Stack file (Compose plugin)"
+msgstr "堆疊檔案（Compose 外掛）"
+
+msgid "Stack file location. The stack files are rendered by the Compose plugin into its shared folder and are managed there, so this path cannot be changed here. Set the folder in Services -> Compose -> Settings."
+msgstr "堆疊檔案位置。堆疊檔案由 Compose 外掛渲染至其共享資料夾下並於該處管理，因此此路徑無法在此變更。請在 服務 -> Compose -> 設定 中設定該資料夾。"
+
+msgid "Data shared folder"
+msgstr "資料共享資料夾"
+
+msgid "Shared folder mapped to the Nextcloud data directory inside the container (/var/www/html). To move the data or the database folder, select the new folder in the form but do NOT save yet - click 'Test directories' to validate the changed folders and 'Migrate data' to copy them. Save only after the migration succeeded; the data in the old folders is removed when the settings are saved."
+msgstr "對應到容器內 Nextcloud 資料目錄（/var/www/html）的共享資料夾。要搬移資料或資料庫目錄：在表單中選取新資料夾但不要儲存——按「測試目錄」驗證已改動的資料夾，再按「遷移資料」搬移。確認遷移成功後才按儲存；儲存設定時會刪除舊資料夾裡的資料。"
+
+msgid "Test directories"
+msgstr "測試目錄"
+
+msgid "Migrate data"
+msgstr "遷移資料"
+
+msgid "Validate the selected shared folders"
+msgstr "驗證所選的共享資料夾"
+
+msgid "Directory migration"
+msgstr "目錄遷移"
+
+msgid "Do you really want to migrate the data of the changed folders? The service is stopped, the data is copied with rsync (the originals stay untouched) and the completed migration is recorded. Nothing is saved until you click Save; the stack runs on the new locations after Apply and the data in the old folders is removed when the settings are saved."
+msgstr "確定要遷移已改動資料夾的資料嗎？服務會先停止，資料以 rsync 複製（原始資料保留），並記錄已完成的遷移。按下「儲存」之前不會寫入任何設定；套用後堆疊會使用新位置執行，儲存設定時會刪除舊資料夾裡的資料。"
+
+msgid "Removing the previous data"
+msgstr "正在刪除原資料"
+
+msgid "Database shared folder"
+msgstr "資料庫共享資料夾"
+
+msgid "Shared folder mapped to the MariaDB data directory inside the container (/var/lib/mysql). To move the data or the database folder, select the new folder in the form but do NOT save yet - click 'Test directories' to validate the changed folders and 'Migrate data' to copy them. Save only after the migration succeeded; the data in the old folders is removed when the settings are saved."
+msgstr "對應到容器內 MariaDB 資料目錄（/var/lib/mysql）的共享資料夾。要搬移資料或資料庫目錄：在表單中選取新資料夾但不要儲存——按「測試目錄」驗證已改動的資料夾，再按「遷移資料」搬移。確認遷移成功後才按儲存；儲存設定時會刪除舊資料夾裡的資料。"
+
+msgid "Database"
+msgstr "資料庫"
+
+msgid "Database username"
+msgstr "資料庫使用者名稱"
+
+msgid "Database name"
+msgstr "資料庫名稱"
+
+msgid "Database password"
+msgstr "資料庫密碼"
+
+msgid "Password of the Nextcloud database user. Changing it after the first deployment requires resetting the database directory."
+msgstr "Nextcloud 資料庫使用者的密碼。首次部署後修改密碼需重置資料庫目錄。"
+
+msgid "Administrator"
+msgstr "管理員"
+
+msgid "Administrator user"
+msgstr "管理員使用者名稱"
+
+msgid "Name of the Nextcloud administrator account created on the first start."
+msgstr "首次啟動時建立的 Nextcloud 管理員帳號名稱。"
+
+msgid "Administrator password"
+msgstr "管理員密碼"
+
+msgid "Password of the administrator account, used for the initial setup only. Required before the stack is created."
+msgstr "管理員帳號的密碼，僅用於初始化。建立堆疊之前必須填寫。"
+
+msgid "Network"
+msgstr "網路"
+
+msgid "Web port"
+msgstr "Web 連接埠"
+
+msgid "Port of the Nextcloud web interface (container port is fixed at 80)."
+msgstr "Nextcloud 網頁介面連接埠（容器內連接埠固定為 80）。"
+
+msgid "Timezone"
+msgstr "時區"
+
+msgid "Timezone used inside the containers, e.g. Asia/Shanghai."
+msgstr "容器內使用的時區，如 Asia/Shanghai。"
+
+msgid "Trusted domains"
+msgstr "信任網域"
+
+msgid "Space-separated list of the domains/IPs Nextcloud is reachable at. Leave empty to use the host name."
+msgstr "Nextcloud 可存取的網域/IP 清單，以空格分隔。留空則使用主機名稱。"
+
+msgid "Start"
+msgstr "啟動"
+
+msgid "Stop"
+msgstr "停止"
+
+msgid "Restart"
+msgstr "重新啟動"
+
+msgid "Upgrade"
+msgstr "升級"
+
+msgid "View logs"
+msgstr "檢視日誌"
+
+msgid "View compose file"
+msgstr "檢視 Compose 檔案"
+
+msgid "Open Nextcloud"
+msgstr "開啟 Nextcloud"
+
+msgid "Do you really want to stop the Nextcloud stack? The containers are removed; data, database and settings are kept."
+msgstr "確定要停止 Nextcloud 堆疊嗎？容器將被移除；資料、資料庫與設定保留。"
+
+msgid "Do you really want to restart the Nextcloud stack?"
+msgstr "確定要重新啟動 Nextcloud 堆疊嗎？"
+
+msgid "Do you really want to upgrade the Nextcloud stack? Newer images are pulled and the stack is recreated. Read the upstream release notes before major upgrades."
+msgstr "確定要升級 Nextcloud 堆疊嗎？將拉取新映像並重建堆疊。大版本升級前請先閱讀上游發布說明。"
+
+msgid "Nextcloud deploy/start output"
+msgstr "Nextcloud 部署/啟動輸出"
+
+msgid "Nextcloud stop output"
+msgstr "Nextcloud 停止輸出"
+
+msgid "Nextcloud restart output"
+msgstr "Nextcloud 重新啟動輸出"
+
+msgid "Nextcloud upgrade output"
+msgstr "Nextcloud 升級輸出"
+
+msgid "Nextcloud logs"
+msgstr "Nextcloud 日誌"
+
+msgid "Rendered docker-compose.yml"
+msgstr "渲染出的 docker-compose.yml"

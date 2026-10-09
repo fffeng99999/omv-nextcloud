@@ -1,0 +1,8 @@
+version: "1.0"
+type: route
+data:
+  url: "/services/nextcloud/settings"
+  title: _("Settings")
+  editing: true
+  notificationTitle: _("Updated Nextcloud settings.")
+  component: omv-services-nextcloud-settings-form-page

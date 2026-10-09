@@ -1,0 +1,10 @@
+version: "1.0"
+type: navigation-item
+data:
+  path: "services.nextcloud"
+  text: _("Nextcloud")
+  icon: "mdi:cloud"
+  url: "/services/nextcloud"
+  permissions:
+    role:
+    - admin

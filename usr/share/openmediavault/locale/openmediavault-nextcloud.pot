@@ -1,0 +1,211 @@
+# Translation template for openmediavault-nextcloud.
+# Copyright (C) 2026 ${GITHUB_USER}
+# This file is distributed under the same license as the openmediavault-nextcloud package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: openmediavault-nextcloud 8.0.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-08 12:00+0800\n"
+"PO-Revision-Date: 2026-10-08 12:00+0800\n"
+"Last-Translator: ${GITHUB_USER}\n"
+"Language-Team: \n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Nextcloud"
+msgstr ""
+
+msgid "Settings"
+msgstr ""
+
+msgid "Updated Nextcloud settings."
+msgstr ""
+
+msgid "Running"
+msgstr ""
+
+msgid "Stopped"
+msgstr ""
+
+msgid "Partial"
+msgstr ""
+
+msgid "Not installed"
+msgstr ""
+
+msgid "Nextcloud is a self-hosted file sync and share solution. The stack is created in the Compose plugin (Services -> Compose -> Files) where it can also be inspected or edited; configure the Compose plugin shared folder first. Save the settings, click Apply, then use the buttons below to deploy and manage the stack. While the stack is running it starts automatically at boot."
+msgstr ""
+
+msgid "Status"
+msgstr ""
+
+msgid "Service status"
+msgstr ""
+
+msgid "Running version"
+msgstr ""
+
+msgid "Latest version"
+msgstr ""
+
+msgid "Update available"
+msgstr ""
+
+msgid "Service"
+msgstr ""
+
+msgid "Enabled"
+msgstr ""
+
+msgid "Automatically manage the stack from OMV. On Apply the stack is (re)created; disabling the service removes the containers on Apply (data and database are kept)."
+msgstr ""
+
+msgid "Version"
+msgstr ""
+
+msgid "Nextcloud image tag"
+msgstr ""
+
+msgid "Docker image tag for the nextcloud image (e.g. 34.0.4-apache). Prefer pinning a specific version; upgrade with the Upgrade button or change the tag here and Apply."
+msgstr ""
+
+msgid "Storage"
+msgstr ""
+
+msgid "Stack file (Compose plugin)"
+msgstr ""
+
+msgid "Stack file location. The stack files are rendered by the Compose plugin into its shared folder and are managed there, so this path cannot be changed here. Set the folder in Services -> Compose -> Settings."
+msgstr ""
+
+msgid "Data shared folder"
+msgstr ""
+
+msgid "Shared folder mapped to the Nextcloud data directory inside the container (/var/www/html). To move the data or the database folder, select the new folder in the form but do NOT save yet - click 'Test directories' to validate the changed folders and 'Migrate data' to copy them. Save only after the migration succeeded; the data in the old folders is removed when the settings are saved."
+msgstr ""
+
+msgid "Test directories"
+msgstr ""
+
+msgid "Migrate data"
+msgstr ""
+
+msgid "Validate the selected shared folders"
+msgstr ""
+
+msgid "Directory migration"
+msgstr ""
+
+msgid "Do you really want to migrate the data of the changed folders? The service is stopped, the data is copied with rsync (the originals stay untouched) and the completed migration is recorded. Nothing is saved until you click Save; the stack runs on the new locations after Apply and the data in the old folders is removed when the settings are saved."
+msgstr ""
+
+msgid "Removing the previous data"
+msgstr ""
+
+msgid "Database shared folder"
+msgstr ""
+
+msgid "Shared folder mapped to the MariaDB data directory inside the container (/var/lib/mysql). To move the data or the database folder, select the new folder in the form but do NOT save yet - click 'Test directories' to validate the changed folders and 'Migrate data' to copy them. Save only after the migration succeeded; the data in the old folders is removed when the settings are saved."
+msgstr ""
+
+msgid "Database"
+msgstr ""
+
+msgid "Database username"
+msgstr ""
+
+msgid "Database name"
+msgstr ""
+
+msgid "Database password"
+msgstr ""
+
+msgid "Password of the Nextcloud database user. Changing it after the first deployment requires resetting the database directory."
+msgstr ""
+
+msgid "Administrator"
+msgstr ""
+
+msgid "Administrator user"
+msgstr ""
+
+msgid "Name of the Nextcloud administrator account created on the first start."
+msgstr ""
+
+msgid "Administrator password"
+msgstr ""
+
+msgid "Password of the administrator account, used for the initial setup only. Required before the stack is created."
+msgstr ""
+
+msgid "Network"
+msgstr ""
+
+msgid "Web port"
+msgstr ""
+
+msgid "Port of the Nextcloud web interface (container port is fixed at 80)."
+msgstr ""
+
+msgid "Timezone"
+msgstr ""
+
+msgid "Timezone used inside the containers, e.g. Asia/Shanghai."
+msgstr ""
+
+msgid "Trusted domains"
+msgstr ""
+
+msgid "Space-separated list of the domains/IPs Nextcloud is reachable at. Leave empty to use the host name."
+msgstr ""
+
+msgid "Start"
+msgstr ""
+
+msgid "Stop"
+msgstr ""
+
+msgid "Restart"
+msgstr ""
+
+msgid "Upgrade"
+msgstr ""
+
+msgid "View logs"
+msgstr ""
+
+msgid "View compose file"
+msgstr ""
+
+msgid "Open Nextcloud"
+msgstr ""
+
+msgid "Do you really want to stop the Nextcloud stack? The containers are removed; data, database and settings are kept."
+msgstr ""
+
+msgid "Do you really want to restart the Nextcloud stack?"
+msgstr ""
+
+msgid "Do you really want to upgrade the Nextcloud stack? Newer images are pulled and the stack is recreated. Read the upstream release notes before major upgrades."
+msgstr ""
+
+msgid "Nextcloud deploy/start output"
+msgstr ""
+
+msgid "Nextcloud stop output"
+msgstr ""
+
+msgid "Nextcloud restart output"
+msgstr ""
+
+msgid "Nextcloud upgrade output"
+msgstr ""
+
+msgid "Nextcloud logs"
+msgstr ""
+
+msgid "Rendered docker-compose.yml"
+msgstr ""

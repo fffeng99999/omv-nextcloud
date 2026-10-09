@@ -1,0 +1,587 @@
+#!/usr/bin/env dash
+#
+# This file is part of OpenMediaVault.
+#
+# @license   https://www.gnu.org/licenses/gpl.html GPL Version 3
+# @author    ${GITHUB_USER} <${GITHUB_USER}@users.noreply.github.com>
+#
+# OpenMediaVault is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# Control the Nextcloud Docker Compose stack registered in the
+# openmediavault-compose plugin.
+#
+# Usage: omv-nextcloud-ctl <cmd> [arg] [arg]
+#
+# The stack is owned by the Compose plugin and lives in the Compose
+# plugin shared folder:
+#   <compose shared folder>/nextcloud/nextcloud.yml
+#   <compose shared folder>/nextcloud/nextcloud.env
+# Every stack command is executed through /usr/sbin/omv-compose-run
+# (the helper of the Compose plugin), so the same --file/--env-file
+# arguments are used as from the Compose web UI.
+#
+# Directory migration commands work on the two shared folder
+# references of the plugin (dataRef, dbRef). The request file
+#   /var/lib/openmediavault/nextcloud-migrate-request.json
+# names the target folders that are currently selected in the settings
+# form (i.e. not saved yet), keyed by property, e.g.
+#   {"dataRef":"<uuid>","dbRef":"<uuid>"}
+# Only the properties listed there are handled, everything else is left
+# untouched.
+#   testdirall        validate every requested target directory
+#   migrateall        copy every requested directory, verify the copy and
+#                     record the migration
+#   cleanupall        remove the old data of every property that was
+#                     migrated and saved afterwards
+#   hasdata <prop> <ref>
+#                     exit 0 when the given folder holds data, 1 else
+#
+# Commands:
+#   up          start the stack (docker compose up -d)
+#   down        stop and remove the containers (data is kept)
+#   restart     restart the stack
+#   upgrade     pull newer images and recreate the stack
+#   status      print "running" | "partial" | "stopped" | "notinstalled"
+#   version     print the Nextcloud status.php JSON from the local web server
+#   latest      print the latest upstream release tag from GitHub
+#   logs        print the last 300 log lines of all services
+#   showcompose print the rendered <stack>.yml
+#   path        print the resolved stack directory (or nothing)
+#   unregister  remove the stack from the Compose plugin (used on purge)
+
+set -u
+
+. /usr/share/openmediavault/scripts/helper-functions
+
+STATE_DIR="/var/lib/openmediavault"
+REQUEST_FILE="/var/lib/openmediavault/nextcloud-migrate-request.json"
+
+# Name of the stack in the Compose plugin; also the stack directory and
+# the base name of the generated files.
+STACK="nextcloud"
+
+# The two shared folder references the plugin stores in its settings.
+REFS="dataRef dbRef"
+
+CMD="${1:-}"
+ARG="${2:-}"
+ARG2="${3:-}"
+
+case "$CMD" in
+	up|down|restart|upgrade|status|version|latest|logs|showcompose|path|unregister|testdirall|migrateall|cleanupall|hasdata)
+	;;
+	*)
+		echo "Usage: omv-nextcloud-ctl <up|down|restart|upgrade|status|version|latest|logs|showcompose|path|unregister|testdirall|migrateall|cleanupall|hasdata> [arg] [arg]" >&2
+		exit 64
+	;;
+esac
+
+# ---------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------
+
+# Read a scalar property of a configuration object from the config
+# database. The value may be quoted (string) or not (boolean/number), so
+# the quotes are stripped and the result trimmed.
+conf_value() {
+	omv-confdbadm read "$1" 2>/dev/null | tr -d '\n' \
+		| sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\([^,}]*\).*/\1/p" \
+		| tr -d '"' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+}
+
+# Read one property of the migration request file (empty when absent).
+req_value() {
+	python3 -c '
+import json, sys
+try:
+    data = json.load(open("'"$REQUEST_FILE"'"))
+except Exception:
+    data = {}
+value = data.get(sys.argv[1], "")
+print(value if isinstance(value, str) else "")
+' "$1" 2>/dev/null
+}
+
+# Clear the pending cleanup marker of a property (called only after the
+# data has really been removed).
+state_clear_pending() {
+	[ -f "$(state_file "$1")" ] || return 0
+	python3 -c '
+import json, sys
+path = sys.argv[1]
+try:
+    data = json.load(open(path))
+except Exception:
+    data = {}
+if isinstance(data, dict):
+    data["pendingCleanup"] = ""
+    json.dump(data, open(path, "w"))
+' "$(state_file "$1")" 2>/dev/null
+}
+
+state_file() {
+	echo "${STATE_DIR}/nextcloud-migration-$1.json"
+}
+
+# Read a key of the migration state file of the given property.
+state_get() {
+	[ -f "$(state_file "$1")" ] || return 0
+	python3 -c '
+import json, sys
+try:
+    data = json.load(open(sys.argv[1]))
+except Exception:
+    data = {}
+value = data.get(sys.argv[2], "")
+print(value if isinstance(value, str) else "")
+' "$(state_file "$1")" "$2" 2>/dev/null
+}
+
+# Resolve a shared folder reference to its absolute path.
+ref_path() {
+	omv_get_sharedfolder_path "$1" 2>/dev/null || true
+}
+
+# Resolve the Compose plugin shared folder (the directory that holds all
+# stacks of the openmediavault-compose plugin).
+compose_sf_path() {
+	_ref="$(conf_value conf.service.compose sharedfolderref)"
+	[ -n "$_ref" ] && ref_path "$_ref"
+}
+
+# Directory of the Nextcloud stack inside the Compose shared folder.
+stack_dir() {
+	_sf="$(compose_sf_path)"
+	[ -n "$_sf" ] && echo "$_sf/$STACK"
+}
+
+is_local_fs() {
+	case "$(findmnt -no FSTYPE --target "$1" 2>/dev/null)" in
+		nfs|nfs4|cifs|smb3|9p|ceph|glusterfs|fuse.sshfs)
+			return 1
+			;;
+		"")
+			return 1
+			;;
+		*)
+			return 0
+			;;
+	esac
+}
+
+dir_is_empty() {
+	[ -z "$(ls -A "$1" 2>/dev/null)" ]
+}
+
+human_size() {
+	numfmt --to=iec "$1" 2>/dev/null || echo "$1 bytes"
+}
+
+prop_label() {
+	case "$1" in
+		dataRef)
+			echo "Data"
+			;;
+		dbRef)
+			echo "Database"
+			;;
+	esac
+}
+
+# True when the folder holds data that belongs to the given property.
+prop_has_data() {
+	_p="$1"
+	_d="$2"
+	case "$_p" in
+		dataRef)
+			# A Nextcloud program/data directory always contains the
+			# configuration file; an initialised data/ directory is a
+			# second hint.
+			if [ -f "$_d/config/config.php" ]; then
+				return 0
+			fi
+			if [ -d "$_d/data" ] && [ -n "$(ls -A "$_d/data" 2>/dev/null)" ]; then
+				return 0
+			fi
+			return 1
+			;;
+		dbRef)
+			# MariaDB initialises an InnoDB data directory with the
+			# system tablespace (ibdata1) and the mysql/ system schema.
+			if [ -d "$_d/mysql" ] || [ -f "$_d/ibdata1" ]; then
+				return 0
+			fi
+			return 1
+			;;
+	esac
+	return 1
+}
+
+# Remove the data that belongs to the given property from a folder.
+prop_clean() {
+	_p="$1"
+	_d="$2"
+	case "$_p" in
+		dataRef)
+			# The data shared folder is dedicated to Nextcloud (it is
+			# mounted at /var/www/html inside the container), so its whole
+			# content is removed; the shared folder itself is kept.
+			echo "  removing the Nextcloud data below $_d"
+			find "$_d" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+			;;
+		dbRef)
+			echo "  removing the MariaDB data directory"
+			find "$_d" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+			;;
+	esac
+}
+
+# check_target <prop> <oldDir> <newDir> - print the validation report and
+# return 0 when the target can host the data, 1 otherwise.
+check_target() {
+	_p="$1"
+	_old="$2"
+	_new="$3"
+	_rc=0
+	echo "--- $(prop_label "$_p") ---"
+	echo "Target directory : $_new"
+	if [ -n "$_old" ]; then
+		echo "Current directory: $_old"
+	fi
+	if [ ! -d "$_new" ]; then
+		echo "FAIL  The target directory does not exist."
+		return 1
+	fi
+	echo "ok    Directory exists"
+	if touch "$_new/.ovm-write-test" 2>/dev/null; then
+		rm -f "$_new/.ovm-write-test"
+		echo "ok    Directory is writable"
+	else
+		echo "FAIL  Directory is not writable"
+		_rc=1
+	fi
+	if is_local_fs "$_new"; then
+		echo "ok    Local filesystem ($(findmnt -no FSTYPE --target "$_new" 2>/dev/null))"
+	else
+		echo "FAIL  Not a local filesystem - Nextcloud does not support network shares"
+		_rc=1
+	fi
+	case "$_p" in
+		dataRef)
+			if dir_is_empty "$_new"; then
+				echo "ok    Target is empty (Nextcloud initialises it on first start)"
+			elif [ -f "$_new/config/config.php" ]; then
+				echo "ok    Target already holds a Nextcloud installation"
+			else
+				echo "FAIL  Target is not empty and does not look like a Nextcloud installation"
+				echo "      Nextcloud expects the program/data directory (config/config.php, data/)."
+				echo "      Select an empty folder, or migrate an existing installation into it."
+				_rc=1
+			fi
+			;;
+		dbRef)
+			if dir_is_empty "$_new"; then
+				echo "ok    Target is empty (MariaDB initialises it on first start)"
+			elif [ -f "$_new/ibdata1" ] || [ -d "$_new/mysql" ]; then
+				echo "ok    Target already holds a MariaDB data directory"
+			else
+				echo "FAIL  Target is not empty and does not look like a MariaDB data directory"
+				_rc=1
+			fi
+			;;
+	esac
+	if [ -n "$_old" ] && [ -d "$_old" ] && ! dir_is_empty "$_old"; then
+		_need="$(du -sb "$_old" 2>/dev/null | awk '{print $1}')"
+		_avail="$(df -B1 --output=avail "$_new" 2>/dev/null | tail -n 1 | tr -d ' ')"
+		if [ -n "$_need" ]; then
+			echo "Source size    : $(human_size "$_need")"
+		fi
+		if [ -n "$_avail" ]; then
+			echo "Free on target : $(human_size "$_avail")"
+		fi
+		if [ -n "$_need" ] && [ -n "$_avail" ] && [ "$_avail" -lt "$_need" ]; then
+			echo "FAIL  Not enough free space on the target"
+			_rc=1
+		elif [ -n "$_need" ] && [ -n "$_avail" ]; then
+			echo "ok    Enough free space"
+		fi
+	fi
+	if [ "$_rc" -eq 0 ]; then
+		echo "RESULT: ready for migration."
+	else
+		echo "RESULT: NOT usable (see FAIL above)."
+	fi
+	echo ""
+	return "$_rc"
+}
+
+# Run docker compose for the Nextcloud stack through the Compose plugin
+# helper (same --file/--env-file arguments as the Compose web UI).
+dc() {
+	if [ ! -x /usr/sbin/omv-compose-run ]; then
+		echo "ERROR: the openmediavault-compose plugin is not installed." >&2
+		return 1
+	fi
+	/usr/sbin/omv-compose-run "$STACK" "$@" 2>&1
+}
+
+# Stop the stack (best effort).
+stack_down() {
+	dc down --remove-orphans
+}
+
+case "$CMD" in
+	up)
+		dc up -d --remove-orphans
+	;;
+	down)
+		dc down --remove-orphans
+	;;
+	restart)
+		dc restart
+	;;
+	upgrade)
+		dc pull --ignore-pull-failures || true
+		dc up -d --remove-orphans
+	;;
+	status)
+		_dir="$(stack_dir)"
+		if [ -z "$_dir" ] || [ ! -f "$_dir/$STACK.yml" ]; then
+			echo "notinstalled"
+			exit 0
+		fi
+		total=$(dc config --services 2>/dev/null | wc -l)
+		running=$(dc ps --status running -q 2>/dev/null | wc -l)
+		if [ "$total" -eq 0 ] || [ "$running" -eq 0 ]; then
+			echo "stopped"
+		elif [ "$running" -lt "$total" ]; then
+			echo "partial"
+		else
+			echo "running"
+		fi
+	;;
+	version)
+		PORT=8080
+		_envfile="$(stack_dir)/$STACK.env"
+		if [ -f "$_envfile" ]; then
+			env_port=$(sed -n 's/^NEXTCLOUD_PORT=//p' "$_envfile" | tail -n 1)
+			[ -n "$env_port" ] && PORT="$env_port"
+		fi
+		curl -fsS --max-time 3 "http://127.0.0.1:${PORT}/status.php" 2>/dev/null || true
+	;;
+	latest)
+		# Latest upstream release tag. Read the GitHub releases page
+		# redirect (github.com) instead of api.github.com: the anonymous
+		# REST API is rate limited per IP and then fails, whereas the web
+		# redirect is not. The redirect target .../releases/tag/<tag>
+		# points at the newest release that is neither a draft nor a
+		# prerelease, so release candidates are skipped automatically.
+		_url="$(curl -sS -o /dev/null -w '%{redirect_url}' --max-time 6 \
+			https://github.com/nextcloud/server/releases/latest 2>/dev/null || true)"
+		case "${_url}" in
+			*/tag/v*) echo "${_url##*/tag/}" ;;
+			*) : ;;
+		esac
+	;;
+	logs)
+		dc logs --tail 300
+	;;
+	showcompose)
+		cat "$(stack_dir)/$STACK.yml" 2>/dev/null || true
+	;;
+	path)
+		stack_dir
+	;;
+	unregister)
+		# Remove the Nextcloud stack from the Compose plugin (used when
+		# the plugin is removed). The data and database shared folders
+		# are not touched; only the containers and the generated stack
+		# files are removed by the Compose plugin.
+		if [ ! -x /usr/sbin/omv-rpc ]; then
+			echo "omv-rpc not available - skipping."
+			exit 0
+		fi
+		_uuid="$(omv-rpc -u admin Config get '{"id":"conf.service.compose.file"}' 2>/dev/null \
+			| python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    data = []
+if isinstance(data, dict):
+    data = data.get("data", []) or []
+for obj in data:
+    if isinstance(obj, dict) and obj.get("name") == "nextcloud":
+        print(obj.get("uuid", ""))
+        break
+' 2>/dev/null)"
+		if [ -n "$_uuid" ]; then
+			echo "Removing the Nextcloud stack from the Compose plugin ..."
+			omv-rpc -u admin Compose deleteFile "{\"uuid\":\"$_uuid\"}" >/dev/null 2>&1 \
+				&& echo "The stack was removed." \
+				|| echo "The stack could not be removed automatically - delete it on the Compose page."
+		else
+			echo "No Nextcloud stack registered in the Compose plugin."
+		fi
+	;;
+	hasdata)
+		if [ -z "$ARG" ] || [ -z "$ARG2" ]; then
+			exit 1
+		fi
+		_HAS_DIR="$(ref_path "$ARG2")"
+		if [ -n "$_HAS_DIR" ] && prop_has_data "$ARG" "$_HAS_DIR"; then
+			exit 0
+		fi
+		exit 1
+	;;
+	testdirall)
+		_found=0
+		for _p in $REFS; do
+			_newref="$(req_value "$_p")"
+			if [ -z "$_newref" ]; then
+				continue
+			fi
+			_found=1
+			_new="$(ref_path "$_newref")"
+			_old="$(ref_path "$(conf_value conf.service.nextcloud "$_p")")"
+			if [ -z "$_new" ]; then
+				echo "--- $(prop_label "$_p") ---"
+				echo "FAIL  The selected shared folder cannot be resolved."
+				echo ""
+				continue
+			fi
+			if [ -n "$_old" ] && [ "$_new" = "$_old" ]; then
+				echo "--- $(prop_label "$_p") ---"
+				echo "ok    Not changed."
+				echo ""
+				continue
+			fi
+			check_target "$_p" "$_old" "$_new" || true
+		done
+		if [ "$_found" -eq 0 ]; then
+			echo "No directory was changed. Select a new shared folder in the form first."
+		fi
+		exit 0
+	;;
+	migrateall)
+		# 1) validate everything before touching anything
+		_any=0
+		_fail=0
+		for _p in $REFS; do
+			_newref="$(req_value "$_p")"
+			[ -n "$_newref" ] || continue
+			_any=1
+			_new="$(ref_path "$_newref")"
+			_old="$(ref_path "$(conf_value conf.service.nextcloud "$_p")")"
+			if [ -z "$_new" ]; then
+				echo "Cannot resolve the target shared folder of $(prop_label "$_p")." >&2
+				exit 1
+			fi
+			if [ -n "$_old" ] && [ "$_new" = "$_old" ]; then
+				continue
+			fi
+			echo "=== validate $(prop_label "$_p") ==="
+			if ! check_target "$_p" "$_old" "$_new"; then
+				_fail=1
+			fi
+		done
+		if [ "$_any" -eq 0 ]; then
+			echo "No directory was changed. Select a new shared folder in the form first."
+			exit 0
+		fi
+		if [ "$_fail" -ne 0 ]; then
+			echo "Migration aborted: at least one target directory is not usable." >&2
+			exit 1
+		fi
+
+		# 2) stop the stack once, then copy every changed directory
+		echo "=== stop the stack ==="
+		stack_down
+
+		_step=0
+		_total=0
+		for _p in $REFS; do
+			_newref="$(req_value "$_p")"
+			[ -n "$_newref" ] || continue
+			_new="$(ref_path "$_newref")"
+			_old="$(ref_path "$(conf_value conf.service.nextcloud "$_p")")"
+			if [ -n "$_old" ] && [ "$_new" = "$_old" ]; then
+				continue
+			fi
+			_total=$((_total + 1))
+		done
+
+		for _p in $REFS; do
+			_newref="$(req_value "$_p")"
+			[ -n "$_newref" ] || continue
+			_new="$(ref_path "$_newref")"
+			_old="$(ref_path "$(conf_value conf.service.nextcloud "$_p")")"
+			if [ -n "$_old" ] && [ "$_new" = "$_old" ]; then
+				continue
+			fi
+			_step=$((_step + 1))
+			echo ""
+			echo "=== copy $(prop_label "$_p") ($_step/$_total) ==="
+			if [ -z "$_old" ] || [ ! -d "$_old" ] || dir_is_empty "$_old"; then
+				echo "Source is empty - nothing to copy."
+			else
+				echo "$_old/  ->  $_new/"
+				rsync -aHAX --numeric-ids --info=progress2 "$_old/" "$_new/"
+				if [ $? -ne 0 ]; then
+					echo "" >&2
+					echo "ERROR: rsync reported an error for $(prop_label "$_p"). The copy may be incomplete." >&2
+					echo "       Do NOT save the settings - fix the problem and run the migration again." >&2
+					exit 1
+				fi
+				echo ""
+				_diff="$(rsync -aHAXn -i "$_old/" "$_new/" 2>&1 || true)"
+				if [ -n "$_diff" ]; then
+					echo "$_diff" | head -n 40
+					echo "WARNING: the verification found differences (listed above). Review them carefully before saving."
+				else
+					echo "ok    The source and the target are identical."
+				fi
+			fi
+			_files="$(find "$_new" -type f 2>/dev/null | wc -l)"
+			_bytes="$(du -sb "$_new" 2>/dev/null | awk '{print $1}')"
+			echo "Files: $_files   Size: $(human_size "${_bytes:-0}")"
+			cat > "$(state_file "$_p")" <<EOF
+{"fromRef":"$(conf_value conf.service.nextcloud "$_p")","from":"$_old","toRef":"$_newref","to":"$_new","completed":true,"at":"$(date -Iseconds)","pendingCleanup":""}
+EOF
+		done
+
+		echo ""
+		echo "Migration finished, not saved yet. Return to the settings page, click"
+		echo "Save and then Apply; the stack is recreated with the new directories."
+	;;
+	cleanupall)
+		_done=0
+		for _p in $REFS; do
+			_ref="$(state_get "$_p" pendingCleanup)"
+			[ -n "$_ref" ] || continue
+			_dir="$(ref_path "$_ref")"
+			if [ -z "$_dir" ]; then
+				echo "ERROR: the shared folder to clean up ($(prop_label "$_p")) cannot be resolved." >&2
+				continue
+			fi
+			if [ "$_ref" = "$(conf_value conf.service.nextcloud "$_p")" ]; then
+				echo "ERROR: refusing to remove the $(prop_label "$_p") folder that is currently in use." >&2
+				continue
+			fi
+			_done=1
+			echo "--- $(prop_label "$_p") ---"
+			echo "Removing the data under: $_dir"
+			prop_clean "$_p" "$_dir"
+			state_clear_pending "$_p"
+		done
+		if [ "$_done" -eq 0 ]; then
+			echo "No previous data to remove."
+		fi
+		echo "Done."
+	;;
+esac
+
+exit 0

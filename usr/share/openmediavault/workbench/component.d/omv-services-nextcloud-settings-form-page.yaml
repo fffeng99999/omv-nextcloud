@@ -1,0 +1,286 @@
+version: "1.0"
+type: component
+data:
+  name: omv-services-nextcloud-settings-form-page
+  type: formPage
+  config:
+    request:
+      service: Nextcloud
+      get:
+        method: get
+        transform:
+          statusText: "{{ statusText | translate }}"
+      post:
+        method: set
+    hints:
+      - type: info
+        text: _("Nextcloud is a self-hosted file sync and share solution. The stack is created in the Compose plugin (Services -> Compose -> Files) where it can also be inspected or edited; configure the Compose plugin shared folder first. Save the settings, click Apply, then use the buttons below to deploy and manage the stack. While the stack is running it starts automatically at boot.")
+        dismissible: true
+        stateId: 5b8e2c1a-9f3d-4c47-a2b6-0d84e13f7c55
+    fields:
+      - type: divider
+        title: _("Status")
+      - type: textInput
+        name: statusText
+        label: _("Service status")
+        submitValue: false
+        readonly: true
+      - type: checkbox
+        name: running
+        label: _("Running")
+        submitValue: false
+        readonly: true
+      - type: textInput
+        name: runningVersion
+        label: _("Running version")
+        submitValue: false
+        readonly: true
+      - type: textInput
+        name: latestVersion
+        label: _("Latest version")
+        submitValue: false
+        readonly: true
+      - type: checkbox
+        name: updateAvailable
+        label: _("Update available")
+        submitValue: false
+        readonly: true
+      - type: divider
+        title: _("Service")
+      - type: checkbox
+        name: enable
+        label: _("Enabled")
+        hint: _("Automatically manage the stack from OMV. On Apply the stack is (re)created; disabling the service removes the containers on Apply (data and database are kept).")
+        value: false
+
+      - type: divider
+        title: _("Version")
+      - type: textInput
+        name: version
+        label: _("Nextcloud image tag")
+        hint: _("Docker image tag for the nextcloud image (e.g. 34.0.4-apache). Prefer pinning a specific version; upgrade with the Upgrade button or change the tag here and Apply.")
+        value: "34.0.4-apache"
+        validators:
+          required: true
+
+      - type: divider
+        title: _("Storage")
+      - type: textInput
+        name: composeFile
+        label: _("Stack file (Compose plugin)")
+        hint: _("Stack file location. The stack files are rendered by the Compose plugin into its shared folder and are managed there, so this path cannot be changed here. Set the folder in Services -> Compose -> Settings.")
+        submitValue: false
+        readonly: true
+      - type: sharedFolderSelect
+        name: dataRef
+        label: _("Data shared folder")
+        hint: _("Shared folder mapped to the Nextcloud data directory inside the container (/var/www/html). To move the data or the database folder, select the new folder in the form but do NOT save yet - click 'Test directories' to validate the changed folders and 'Migrate data' to copy them. Save only after the migration succeeded; the data in the old folders is removed when the settings are saved.")
+        hasEmptyOption: true
+        value: ""
+        validators:
+          requiredIf:
+            operator: truthy
+            arg0: enable
+      - type: sharedFolderSelect
+        name: dbRef
+        label: _("Database shared folder")
+        hint: _("Shared folder mapped to the MariaDB data directory inside the container (/var/lib/mysql). To move the data or the database folder, select the new folder in the form but do NOT save yet - click 'Test directories' to validate the changed folders and 'Migrate data' to copy them. Save only after the migration succeeded; the data in the old folders is removed when the settings are saved.")
+        hasEmptyOption: true
+        value: ""
+        validators:
+          requiredIf:
+            operator: truthy
+            arg0: enable
+
+      - type: divider
+        title: _("Database")
+      - type: textInput
+        name: dbUsername
+        label: _("Database username")
+        value: "nextcloud"
+        validators:
+          required: true
+      - type: textInput
+        name: dbDatabaseName
+        label: _("Database name")
+        value: "nextcloud"
+        validators:
+          required: true
+      - type: passwordInput
+        name: dbPassword
+        label: _("Database password")
+        hint: _("Password of the Nextcloud database user. Changing it after the first deployment requires resetting the database directory.")
+        value: ""
+        autocomplete: "new-password"
+        validators:
+          requiredIf:
+            operator: truthy
+            arg0: enable
+
+      - type: divider
+        title: _("Administrator")
+      - type: textInput
+        name: adminUser
+        label: _("Administrator user")
+        hint: _("Name of the Nextcloud administrator account created on the first start.")
+        value: "admin"
+        validators:
+          required: true
+      - type: passwordInput
+        name: adminPassword
+        label: _("Administrator password")
+        hint: _("Password of the administrator account, used for the initial setup only. Required before the stack is created.")
+        value: ""
+        autocomplete: "new-password"
+        validators:
+          requiredIf:
+            operator: truthy
+            arg0: enable
+
+      - type: divider
+        title: _("Network")
+      - type: numberInput
+        name: port
+        label: _("Web port")
+        hint: _("Port of the Nextcloud web interface (container port is fixed at 80).")
+        value: 8080
+        validators:
+          min: 1
+          max: 65535
+          patternType: port
+      - type: textInput
+        name: timeZone
+        label: _("Timezone")
+        hint: _("Timezone used inside the containers, e.g. Asia/Shanghai.")
+        value: "Etc/UTC"
+      - type: textInput
+        name: trustedDomains
+        label: _("Trusted domains")
+        hint: _("Space-separated list of the domains/IPs Nextcloud is reachable at. Leave empty to use the host name.")
+        value: ""
+    buttons:
+      - text: _("Test directories")
+        execute:
+          type: taskDialog
+          taskDialog:
+            config:
+              title: _("Validate the selected shared folders")
+              width: "70%"
+              startOnInit: true
+              request:
+                service: Nextcloud
+                method: testDir
+                params:
+                  dataRef: "{{ dataRef }}"
+                  dbRef: "{{ dbRef }}"
+      - text: _("Migrate data")
+        confirmationDialogConfig:
+          template: confirmation
+          message: _("Do you really want to migrate the data of the changed folders? The service is stopped, the data is copied with rsync (the originals stay untouched) and the completed migration is recorded. Nothing is saved until you click Save; the stack runs on the new locations after Apply and the data in the old folders is removed when the settings are saved.")
+        execute:
+          type: taskDialog
+          taskDialog:
+            config:
+              title: _("Directory migration")
+              width: "70%"
+              startOnInit: true
+              request:
+                service: Nextcloud
+                method: migrate
+                params:
+                  dataRef: "{{ dataRef }}"
+                  dbRef: "{{ dbRef }}"
+      - text: _("Start")
+        execute:
+          type: taskDialog
+          taskDialog:
+            config:
+              title: _("Nextcloud deploy/start output")
+              width: "70%"
+              startOnInit: true
+              request:
+                service: Nextcloud
+                method: start
+      - text: _("Stop")
+        confirmationDialogConfig:
+          template: confirmation
+          message: _("Do you really want to stop the Nextcloud stack? The containers are removed; data, database and settings are kept.")
+        execute:
+          type: taskDialog
+          taskDialog:
+            config:
+              title: _("Nextcloud stop output")
+              width: "70%"
+              startOnInit: true
+              request:
+                service: Nextcloud
+                method: stop
+      - text: _("Restart")
+        confirmationDialogConfig:
+          template: confirmation
+          message: _("Do you really want to restart the Nextcloud stack?")
+        execute:
+          type: taskDialog
+          taskDialog:
+            config:
+              title: _("Nextcloud restart output")
+              width: "70%"
+              startOnInit: true
+              request:
+                service: Nextcloud
+                method: restart
+      - text: _("Upgrade")
+        confirmationDialogConfig:
+          template: confirmation
+          message: _("Do you really want to upgrade the Nextcloud stack? Newer images are pulled and the stack is recreated. Read the upstream release notes before major upgrades.")
+        execute:
+          type: taskDialog
+          taskDialog:
+            config:
+              title: _("Nextcloud upgrade output")
+              width: "70%"
+              startOnInit: true
+              request:
+                service: Nextcloud
+                method: upgrade
+      - text: _("View logs")
+        execute:
+          type: taskDialog
+          taskDialog:
+            config:
+              title: _("Nextcloud logs")
+              width: "70%"
+              startOnInit: true
+              request:
+                service: Nextcloud
+                method: getLog
+      - text: _("View compose file")
+        execute:
+          type: taskDialog
+          taskDialog:
+            config:
+              title: _("Rendered docker-compose.yml")
+              width: "70%"
+              startOnInit: true
+              request:
+                service: Nextcloud
+                method: getShowConfig
+      - text: _("Open Nextcloud")
+        execute:
+          type: url
+          url: "/externalRedirect/{{ ['http://', location() | get('hostname'), ':', port] | join | encodeuricomponent }}"
+      - template: cancel
+        execute:
+          type: url
+          url: "/services/nextcloud"
+      - template: submit
+        execute:
+          type: taskDialog
+          taskDialog:
+            config:
+              title: _("Removing the previous data")
+              width: "70%"
+              startOnInit: true
+              request:
+                service: Nextcloud
+                method: cleanupOld

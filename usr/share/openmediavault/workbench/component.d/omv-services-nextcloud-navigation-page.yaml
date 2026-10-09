@@ -1,0 +1,5 @@
+version: "1.0"
+type: component
+data:
+  name: omv-services-nextcloud-navigation-page
+  type: navigationPage

@@ -1,0 +1,53 @@
+openmediavault-nextcloud (8.0.2) stable; urgency=medium
+
+  * The data shared folder (mounted at /var/www/html inside the container)
+    is dedicated to Nextcloud, so removing the previous data after a
+    directory migration now clears the whole folder instead of only the
+    Nextcloud sub-directories. The shared folder itself is kept.
+
+ -- ${GITHUB_USER} <${GITHUB_USER}@users.noreply.github.com>  Wed, 08 Oct 2026 12:00:00 +0800
+
+openmediavault-nextcloud (8.0.1) stable; urgency=medium
+
+  * Bring back directory migration: the settings page can move the data
+    (/var/www/html) and the MariaDB database (/var/lib/mysql) shared
+    folders to other folders without shell access.
+    - "Test directories" validates every folder that was changed in the
+      form (not saved yet): it must exist, be writable, live on a local
+      filesystem and either be empty or already hold the matching data
+      (config/config.php for the data folder, ibdata1/mysql for the
+      database). Free space is compared with the size of the current
+      folder.
+    - "Migrate data" (with a confirmation dialog) stops the stack,
+      copies every changed folder with rsync (permissions, ACLs and
+      xattrs preserved) and verifies each copy against its source. The
+      completed migration is recorded; because the stack file mounts the
+      folders through the Compose placeholder, the stack is not started
+      again until the settings are saved and applied.
+    - Saving is refused per changed folder until its migration has been
+      recorded; afterwards the data of the folders that were actually
+      changed is removed by a background task that runs right after the
+      settings have been saved.
+    - rsync is added to the package dependencies.
+
+ -- ${GITHUB_USER} <${GITHUB_USER}@users.noreply.github.com>  Wed, 08 Oct 2026 12:00:00 +0800
+
+openmediavault-nextcloud (8.0.0) stable; urgency=medium
+
+  * Initial release: Nextcloud file sync and share plugin for
+    OpenMediaVault 8.x.
+    - Settings: image tag, web port, timezone, data and database shared
+      folders, database credentials, administrator credentials and the
+      trusted domains.
+    - The Docker Compose stack (nextcloud, db and redis) is registered
+      in the openmediavault-compose plugin on save and rendered by it;
+      the plugin only manages the OMV-side integration (registration,
+      lifecycle, status) and never modifies Nextcloud itself.
+    - Start/stop/restart/upgrade run through 'docker compose' as
+      background tasks with live output.
+    - Live status: container state, running Nextcloud version
+      (status.php), latest upstream release and update detection, log
+      viewer and rendered compose file preview.
+    - Simplified and Traditional Chinese translations included.
+
+ -- ${GITHUB_USER} <${GITHUB_USER}@users.noreply.github.com>  Wed, 08 Oct 2026 12:00:00 +0800
